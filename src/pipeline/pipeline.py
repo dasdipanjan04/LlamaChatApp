@@ -7,11 +7,12 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
     TextIteratorStreamer,
-    pipeline
+    pipeline,
 )
 from asyncio import to_thread
 from huggingface_hub import HfFolder
 from threading import Thread
+
 load_dotenv()
 
 api_token = os.getenv("API_TOKEN")
@@ -19,15 +20,18 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 HfFolder.save_token(api_token)
 
+
 class ModelManager:
     def __init__(self):
         self.model = None
         self.tokenizer = None
         self.abuse_detector = None
-        self.lock = Lock()  # To ensure safe initialization
+        self.lock = Lock()
 
     async def load_model_async(self):
-        await to_thread(self._load_model)
+        with self.lock:
+            if self.model is None or self.abuse_detector is None:
+                await to_thread(self._load_model)
 
     def _load_model(self):
         llm_model = "meta-llama/Llama-3.1-8B"
@@ -43,18 +47,16 @@ class ModelManager:
             if self.tokenizer.pad_token_id is None:
                 self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
 
-
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
             bnb_4bit_compute_dtype=torch.bfloat16,
         )
-
         self.model = AutoModelForCausalLM.from_pretrained(
             llm_model,
             quantization_config=quantization_config,
-            device_map="auto"
+            device_map="auto",
         )
         self.model.config.pad_token_id = self.tokenizer.pad_token_id
         self.model.resize_token_embeddings(len(self.tokenizer))
@@ -63,10 +65,12 @@ class ModelManager:
         self.abuse_detector = pipeline(
             "text-classification",
             model="unitary/toxic-bert",
-            device=0 if torch.cuda.is_available() else -1
+            device=0 if torch.cuda.is_available() else -1,
         )
 
     def is_abusive(self, text: str) -> bool:
+        if not self.abuse_detector:
+            raise ValueError("Abuse detector is not initialized.")
         results = self.abuse_detector(text)
         return any(
             result["label"] in ["toxic", "severe_toxic", "offensive"]
@@ -75,6 +79,8 @@ class ModelManager:
         )
 
     async def generate_response(self, text: str):
+        await self.load_model_async()
+
         if self.is_abusive(text):
             yield "Please refrain from such language.\nLet us have a constructive conversation."
             return
@@ -98,11 +104,11 @@ class ModelManager:
         generate_kwargs = dict(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_new_tokens=300,
+            max_new_tokens=200,
             do_sample=True,
-            top_p=0.85,
-            top_k=50,
-            temperature=0.5,
+            top_p=0.9,
+            top_k=40,
+            temperature=0.7,
             streamer=streamer,
             eos_token_id=self.tokenizer.eos_token_id,
             repetition_penalty=1.2,
@@ -115,5 +121,6 @@ class ModelManager:
 
         for token in streamer:
             yield token
+
 
 model_manager = ModelManager()
