@@ -7,18 +7,18 @@ from contextlib import asynccontextmanager
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from src.pipeline.parallel_processor import generate_parallel_responses
-from src.pipeline.pipeline import model_manager
-import src.log_config.log_config as log_config
+from src.pipeline import ModelManager, generate_parallel_responses
+from src.log_config import configure_logging
 import logging
+model_manager = ModelManager()
 debug_mode = True
-log_config.configure_logging(debug_mode)
+configure_logging(debug_mode)
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
 
 request_queue = Queue()
-MAX_CONCURRENT_REQUESTS = 4
+MAX_CONCURRENT_REQUESTS = 20
 
 
 class QueryRequest(BaseModel):
@@ -70,8 +70,9 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         },
     )
 
+
 @app.post("/query")
-@limiter.limit("5/minute")
+@limiter.limit("10000/minute")
 async def process_query(request: Request, query: QueryRequest):
     response = asyncio.Future()
 

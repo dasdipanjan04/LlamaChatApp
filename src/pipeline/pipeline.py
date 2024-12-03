@@ -104,16 +104,17 @@ class ModelManager:
         generate_kwargs = dict(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_new_tokens=200,
+            max_new_tokens=50,
             do_sample=True,
-            top_p=0.9,
+            top_p=0.95,
             top_k=40,
-            temperature=0.7,
+            temperature=0.8,
             streamer=streamer,
             eos_token_id=self.tokenizer.eos_token_id,
             repetition_penalty=1.2,
             no_repeat_ngram_size=3,
             pad_token_id=self.tokenizer.pad_token_id,
+            early_stopping=True,
         )
 
         t = Thread(target=self.model.generate, kwargs=generate_kwargs)
@@ -121,6 +122,3 @@ class ModelManager:
 
         for token in streamer:
             yield token
-
-
-model_manager = ModelManager()
