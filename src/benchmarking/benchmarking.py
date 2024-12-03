@@ -33,7 +33,11 @@ async def send_request(client, prompt):
 def get_gpu_utilization():
     try:
         output = subprocess.check_output(
-            ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+            [
+                "nvidia-smi",
+                "--query-gpu=utilization.gpu,memory.used,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
             encoding="utf-8",
         )
         utilization, memory_used, memory_total = map(int, output.split(","))
@@ -62,6 +66,7 @@ async def benchmark_service(concurrent_requests, num_requests):
 
         gpu_stats_over_time = []
         start_time = time.time()
+
         async def log_gpu_stats(gpu_stats_over_time, start_time):
             while True:
                 gpu_stats = get_gpu_utilization()
@@ -69,11 +74,13 @@ async def benchmark_service(concurrent_requests, num_requests):
                 gpu_stats_over_time.append(gpu_stats)
                 await asyncio.sleep(1)
 
-        gpu_logger_task = asyncio.create_task(log_gpu_stats(gpu_stats_over_time, start_time))
+        gpu_logger_task = asyncio.create_task(
+            log_gpu_stats(gpu_stats_over_time, start_time)
+        )
         gpu_stats_before = get_gpu_utilization()
         tasks = [
             send_request_with_semaphore(client, PROMPTS[_ % len(PROMPTS)], semaphore)
-            #send_request(client, PROMPTS[_ % len(PROMPTS)])
+            # send_request(client, PROMPTS[_ % len(PROMPTS)])
             for _ in range(num_requests)
         ]
 
@@ -124,8 +131,9 @@ async def benchmark_service(concurrent_requests, num_requests):
             "throughput": throughput,
             "gpu_stats_before": gpu_stats_before,
             "gpu_stats_after": gpu_stats_after,
-            "gpu_stats_over_time": gpu_stats_over_time
+            "gpu_stats_over_time": gpu_stats_over_time,
         }
+
 
 def plot_gpu_stats_over_concurrency(gpu_stats):
     plt.figure(figsize=(12, 8))
@@ -168,6 +176,26 @@ def plot_gpu_stats_over_concurrency(gpu_stats):
     plt.show()
 
 
+def plot_avg_latency_vs_concurrency(avg_latency, concurrency):
+    plt.figure()
+    plt.plot(concurrency, avg_latency, marker="o")
+    plt.title("Average Latency vs Concurrency")
+    plt.xlabel("Concurrency Level")
+    plt.ylabel("Average Latency (seconds)")
+    plt.grid(True)
+    plt.show()
+
+
+def plot_throughput_vs_concurrency(throughput, concurrency):
+    plt.figure()
+    plt.plot(concurrency, throughput, marker="o")
+    plt.title("Throughput vs Concurrency")
+    plt.xlabel("Concurrency Level")
+    plt.ylabel("Throughput (requests/second)")
+    plt.grid(True)
+    plt.show()
+
+
 if __name__ == "__main__":
     concurrency_levels = [1, 2, 3, 4]
     num_requests_per_level = 5
@@ -184,21 +212,10 @@ if __name__ == "__main__":
     concurrency = [r[0] for r in results]
     avg_latency = [r[1]["avg_latency"] for r in results]
     throughput = [r[1]["throughput"] for r in results]
-    gpu_stats = {r[1]["concurrent_requests"]: r[1]["gpu_stats_over_time"] for r in results}
-    plt.figure()
-    plt.plot(concurrency, avg_latency, marker="o")
-    plt.title("Average Latency vs Concurrency")
-    plt.xlabel("Concurrency Level")
-    plt.ylabel("Average Latency (seconds)")
-    plt.grid(True)
-    plt.show()
+    gpu_stats = {
+        r[1]["concurrent_requests"]: r[1]["gpu_stats_over_time"] for r in results
+    }
 
-    plt.figure()
-    plt.plot(concurrency, throughput, marker="o")
-    plt.title("Throughput vs Concurrency")
-    plt.xlabel("Concurrency Level")
-    plt.ylabel("Throughput (requests/second)")
-    plt.grid(True)
-    plt.show()
-
+    plot_avg_latency_vs_concurrency(avg_latency, concurrency)
+    plot_throughput_vs_concurrency(throughput, concurrency)
     plot_gpu_stats_over_concurrency(gpu_stats)
