@@ -1,27 +1,31 @@
 import asyncio
 from asyncio import Queue, create_task
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from contextlib import asynccontextmanager
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from src.pipeline import model_manager, generate_parallel_responses
 from src.log_config import configure_logging
+from src.config import DEBUG_MODE, MAX_CONCURRENT_REQUESTS, RATE_LIMIT
 import logging
-debug_mode = True
-configure_logging(debug_mode)
-limiter = Limiter(key_func=get_remote_address)
-app = FastAPI()
-app.state.limiter = limiter
+
 
 request_queue = Queue()
-MAX_CONCURRENT_REQUESTS = 20
+configure_logging(DEBUG_MODE)
 
 
 class QueryRequest(BaseModel):
-    queries: list[str]
+    queries: list[str] = Field(..., description="List of queries")
+
+    @field_validator("queries", mode="before")
+    def validate_queries(cls, queries):
+        if not queries:
+            raise ValueError("Queries cannot be empty.")
+        return queries
 
 
 @asynccontextmanager
@@ -42,14 +46,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.state.rate_limit = RATE_LIMIT
 
 
 async def queue_worker():
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
     while True:
         if not request_queue.empty():
             func, args = await request_queue.get()
-            logging.debug(f"Processing request with args: {args}")
-            asyncio.create_task(func(*args))
+            async with semaphore:
+                logging.debug(f"Processing request with args: {args}")
+                asyncio.create_task(func(*args))
         else:
             await asyncio.sleep(0.1)
 
@@ -70,8 +79,13 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "model": "loaded"}
+
+
 @app.post("/query")
-@limiter.limit("10000/minute")
+@limiter.limit(RATE_LIMIT)
 async def process_query(request: Request, query: QueryRequest):
     response = asyncio.Future()
 
