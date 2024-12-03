@@ -9,7 +9,10 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from src.pipeline.parallel_processor import generate_parallel_responses
 from src.pipeline.pipeline import model_manager
-
+import src.log_config.log_config as log_config
+import logging
+debug_mode = True
+log_config.configure_logging(debug_mode)
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI()
 app.state.limiter = limiter
@@ -25,18 +28,18 @@ class QueryRequest(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await model_manager.load_model_async()
-    print("Model loaded successfully")
+    logging.info("Model loaded successfully")
 
     worker_task = create_task(queue_worker())
 
     yield
 
-    print("Shutting Down Application")
+    logging.info("Shutting Down Application")
     worker_task.cancel()
     try:
         await worker_task
     except asyncio.CancelledError:
-        print("Worker task cancelled")
+        logging.ERROR("Worker task cancelled")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -46,14 +49,14 @@ async def queue_worker():
     while True:
         if not request_queue.empty():
             func, args = await request_queue.get()
-            print(f"Processing request with args: {args}")
+            logging.debug(f"Processing request with args: {args}")
             asyncio.create_task(func(*args))
         else:
             await asyncio.sleep(0.1)
 
 
 async def handle_request(request, response_callback):
-    print(f"Handling request: {request.queries}")
+    logging.debug(f"Handling request: {request.queries}")
     results = await generate_parallel_responses(request.queries)
     await response_callback(results)
 
