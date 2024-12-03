@@ -7,10 +7,9 @@ from contextlib import asynccontextmanager
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from src.pipeline import ModelManager, generate_parallel_responses
+from src.pipeline import model_manager, generate_parallel_responses
 from src.log_config import configure_logging
 import logging
-model_manager = ModelManager()
 debug_mode = True
 configure_logging(debug_mode)
 limiter = Limiter(key_func=get_remote_address)

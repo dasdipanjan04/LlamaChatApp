@@ -1,7 +1,7 @@
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
-from src.pipeline.pipeline import model_manager
+from src.pipeline import ModelManager
 
 global_thread_index = 0
 thread_index_lock = asyncio.Lock()

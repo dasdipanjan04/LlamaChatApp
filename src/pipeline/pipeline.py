@@ -122,3 +122,6 @@ class ModelManager:
 
         for token in streamer:
             yield token
+
+
+model_manager = ModelManager()
