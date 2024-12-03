@@ -104,17 +104,17 @@ class ModelManager:
         generate_kwargs = dict(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_new_tokens=50,
+            max_new_tokens=100,
             do_sample=True,
-            top_p=0.95,
-            top_k=40,
-            temperature=0.8,
+            top_p=0.8,
+            top_k=20,
+            temperature=0.5,
             streamer=streamer,
             eos_token_id=self.tokenizer.eos_token_id,
             repetition_penalty=1.2,
             no_repeat_ngram_size=3,
             pad_token_id=self.tokenizer.pad_token_id,
-            early_stopping=True,
+            early_stopping=False,
         )
 
         t = Thread(target=self.model.generate, kwargs=generate_kwargs)
