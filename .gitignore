@@ -7,3 +7,6 @@ src/benchmarking/__pycache__/
 .env
 src/__pycache__/
 app.log
+tests/__pycache__/
+tests/unit/__pycache__/
+tests/integration/__pycache__/

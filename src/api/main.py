@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     try:
         await worker_task
     except asyncio.CancelledError:
-        logging.ERROR("Worker task cancelled")
+        logging.error("Worker task cancelled")
 
 
 app = FastAPI(lifespan=lifespan)

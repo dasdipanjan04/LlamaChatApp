@@ -46,6 +46,7 @@ class ModelManager:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
             if self.tokenizer.pad_token_id is None:
                 self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
+                self.model.resize_token_embeddings(len(self.tokenizer))
 
         quantization_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -89,11 +90,10 @@ class ModelManager:
             text,
             return_tensors="pt",
             truncation=True,
-            max_length=128,
+            max_length=2048,
             padding=True,
             return_attention_mask=True,
         ).to("cuda")
-
         streamer = TextIteratorStreamer(
             self.tokenizer,
             timeout=60.0,
@@ -105,6 +105,9 @@ class ModelManager:
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
             max_new_tokens=100,
+            min_length=10,
+            max_length=100,
+            length_penalty=0.5,
             do_sample=True,
             top_p=0.8,
             top_k=20,
