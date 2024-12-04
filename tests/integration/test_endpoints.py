@@ -12,13 +12,14 @@ async def test_endpoint():
         response = client.get("/health")
         assert response.status_code == 200
 
+
 @pytest.mark.usefixtures("setup_model_manager")
 @pytest.mark.asyncio
 async def test_query_endpoint_success():
     with TestClient(app) as client:
         response = client.post(
-                "/query", json={"queries": ["What is the capital city of Germany?"]}
-            )
+            "/query", json={"queries": ["What is the capital city of Germany?"]}
+        )
         print(f"I have response: {response.status_code}")
         assert response.status_code == 200
         result = response.json()

@@ -8,11 +8,13 @@ def test_model_initialisation(setup_model_manager: ModelManager):
     assert setup_model_manager.model is not None, "Model should be initialised"
     assert setup_model_manager.tokenizer is not None, "Tokeniser should be initialised"
 
+
 @pytest.mark.usefixtures("setup_model_manager")
 def test_abuse_detection_positive(setup_model_manager: ModelManager):
     offensive_text = "You are stupid and dumb."
     is_abusive = setup_model_manager.is_abusive(offensive_text)
     assert is_abusive is True, "Abuse should be detected!"
+
 
 @pytest.mark.usefixtures("setup_model_manager")
 def test_abuse_detection_negative(setup_model_manager: ModelManager):
@@ -21,6 +23,7 @@ def test_abuse_detection_negative(setup_model_manager: ModelManager):
     assert (
         is_non_abusive is False
     ), "Non offensive sentences should not be detected as abusive!"
+
 
 @pytest.mark.usefixtures("setup_model_manager")
 @pytest.mark.asyncio
