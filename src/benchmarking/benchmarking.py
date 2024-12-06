@@ -1,3 +1,4 @@
+"""Benchmarking to check """
 import asyncio
 import subprocess
 
@@ -18,6 +19,16 @@ PROMPTS = [
 
 
 async def send_request(client, prompt):
+    """
+    Send prompt request to client to check latency, response
+
+    Args:
+        client: API Client responsible for doing get, post etc.
+        prompt: The prompt which be passed to llama.
+
+    Returns:
+        Returns latency, response status code, response text
+    """
     payload = {"queries": [prompt]}
     start_time = time.time()
     try:
@@ -31,6 +42,14 @@ async def send_request(client, prompt):
 
 
 def get_gpu_utilization():
+    """
+    Get GPU Utilization
+
+    Args:
+
+    Returns:
+        Returns GPU Utilization Data
+    """
     try:
         output = subprocess.check_output(
             [
@@ -56,6 +75,17 @@ def get_gpu_utilization():
 
 
 async def send_request_with_semaphore(client, prompt, semaphore):
+    """
+    Semaphore request
+
+    Args:
+        client: API Client
+        prompt: Prompt
+        semaphore: semaphore
+
+    Returns:
+        Returns GPU Utilization Data
+    """
     async with semaphore:
         return await send_request(client, prompt)
 
@@ -136,6 +166,15 @@ async def benchmark_service(concurrent_requests, num_requests):
 
 
 def plot_gpu_stats_over_concurrency(gpu_stats):
+    """
+    Plot GPU stats
+
+    Args:
+        gpu_stats: GPU Stats
+
+    Returns:
+        None
+    """
     plt.figure(figsize=(12, 8))
 
     for concurrency, stats in gpu_stats.items():
@@ -177,6 +216,16 @@ def plot_gpu_stats_over_concurrency(gpu_stats):
 
 
 def plot_avg_latency_vs_concurrency(avg_latency, concurrency):
+    """
+    Plot Average Latency vs Concurrency stats
+
+    Args:
+        avg_latency: Average Latency
+        concurrency: Concurrency
+
+    Returns:
+        None
+    """
     plt.figure()
     plt.plot(concurrency, avg_latency, marker="o")
     plt.title("Average Latency vs Concurrency")
@@ -187,6 +236,16 @@ def plot_avg_latency_vs_concurrency(avg_latency, concurrency):
 
 
 def plot_throughput_vs_concurrency(throughput, concurrency):
+    """
+    Plot Throughput vs Concurrency stats
+
+    Args:
+        throughput: Throughput
+        concurrency: Concurrency
+
+    Returns:
+        None
+    """
     plt.figure()
     plt.plot(concurrency, throughput, marker="o")
     plt.title("Throughput vs Concurrency")

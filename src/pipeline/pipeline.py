@@ -1,4 +1,4 @@
-import logging
+"""Loads model, generates response from llama model."""
 import os
 import torch
 from threading import Lock
@@ -23,6 +23,13 @@ HfFolder.save_token(api_token)
 
 
 class ModelManager:
+    """
+    The ModelManager class handles the following:
+    * Load the model using Bitandbytes 4 bit Qunatisation.
+    * Load model asyncly
+    * Checks whether the prompt is abusive or not
+    * Finally Generates Response
+    """
     def __init__(self):
         self.model = None
         self.tokenizer = None
@@ -31,11 +38,31 @@ class ModelManager:
         self.lock = Lock()
 
     async def load_model_async(self):
+        """
+        Loads the model asyncly
+
+        Args:
+            self
+
+        Returns:
+            None
+        """
         with self.lock:
             if self.model is None or self.abuse_detector is None:
                 await to_thread(self._load_model)
 
     def _load_model(self):
+        """
+        Loads the meta-llama/Llama-3.1-8B model from hugging face
+        Uses a 4 bit quantiosation config to load model in 4 bit
+        Initialize the abuse detection pipeline as well
+
+        Args:
+            self
+
+        Returns:
+            None
+        """
         llm_model = "meta-llama/Llama-3.1-8B"
 
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -72,6 +99,16 @@ class ModelManager:
         )
 
     def is_abusive(self, text: str) -> bool:
+        """
+        Checks whether a certain prompt or response is abusive or not.
+
+        Args:
+            self
+            text (str): The text which needs to checked using the abuse detector
+
+        Returns:
+            True or False based on whether the text is abusive or not.
+        """
         if not self.abuse_detector:
             raise ValueError("Abuse detector is not initialized.")
         results = self.abuse_detector(text)
@@ -82,6 +119,16 @@ class ModelManager:
         )
 
     async def generate_response(self, text: str):
+        """
+        Generates the response from the llama model.
+
+        Args:
+            self
+            text (str): The text or prompt which will be passed to the llama model
+
+        Returns:
+            None
+        """
         await self.load_model_async()
 
         if self.is_abusive(text):

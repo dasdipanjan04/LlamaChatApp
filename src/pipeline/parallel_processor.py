@@ -7,7 +7,16 @@ global_thread_index = 0
 thread_index_lock = asyncio.Lock()
 
 
-async def process_prompt(prompt, idx=None):
+async def process_prompt(prompt):
+    """
+    Process prompt to generate response asyncly
+
+    Args:
+        prompt: The prompt which be passed to the llama response generator
+
+    Returns:
+        Returns the response
+    """
     global global_thread_index
 
     async with thread_index_lock:
@@ -38,12 +47,21 @@ async def process_prompt(prompt, idx=None):
 
 
 async def generate_parallel_responses(prompts):
+    """
+    Generate parallel response from multiple prompts.
+
+    Args:
+        prompts: list of prompts
+
+    Returns:
+        Returns the all prompts results.
+    """
     results = {}
     with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
         loop = asyncio.get_event_loop()
         tasks = [
-            loop.run_in_executor(executor, asyncio.run, process_prompt(prompt, idx))
-            for idx, prompt in enumerate(prompts)
+            loop.run_in_executor(executor, asyncio.run, process_prompt(prompt))
+            for _, prompt in enumerate(prompts)
         ]
         responses = await asyncio.gather(*tasks)
 
