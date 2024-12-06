@@ -10,3 +10,5 @@ app.log
 tests/__pycache__/
 tests/unit/__pycache__/
 tests/integration/__pycache__/
+AutoGPTQ/
+quantized_model_dir/

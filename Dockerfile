@@ -1,25 +1,26 @@
-FROM python:3.10-slim
+FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-devel
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY src ./src/
 
-RUN pip install -r requirements.txt
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
-    gnupg && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
-    dpkg -i cuda-keyring_1.0-1_all.deb && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    libcudnn8 libcudnn8-dev && \
-    apt-get clean && \
+RUN apt update && apt upgrade -y && \
+    apt install -y software-properties-common curl wget git && \
+    apt update && \
+    apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN dpkg-query -W libcudnn8 libcudnn8-dev
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+ENV PATH=/usr/local/cuda/bin:$PATH
 
-COPY src ./src/
+COPY requirements.txt .
+
+RUN pip3 install -r requirements.txt
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+RUN useradd -m appuser && chown -R appuser /app
+
+USER appuser
+
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

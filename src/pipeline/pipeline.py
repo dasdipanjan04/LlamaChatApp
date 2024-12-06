@@ -1,3 +1,4 @@
+import logging
 import os
 import torch
 from threading import Lock
@@ -14,7 +15,7 @@ from huggingface_hub import HfFolder
 from threading import Thread
 
 load_dotenv()
-
+os.environ["CURL_CA_BUNDLE"] = ""
 api_token = os.getenv("API_TOKEN")
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
@@ -26,6 +27,7 @@ class ModelManager:
         self.model = None
         self.tokenizer = None
         self.abuse_detector = None
+        self.quantized_model_dir = "quantized_model_dir"
         self.lock = Lock()
 
     async def load_model_async(self):
