@@ -1,4 +1,5 @@
 """Loads model, generates response from llama model."""
+
 import os
 import torch
 from threading import Lock
@@ -30,6 +31,7 @@ class ModelManager:
     * Checks whether the prompt is abusive or not
     * Finally Generates Response
     """
+
     def __init__(self):
         self.model = None
         self.tokenizer = None

@@ -19,7 +19,8 @@ configure_logging(DEBUG_MODE)
 
 
 class QueryRequest(BaseModel):
-    """" Query request and validation"""
+    """ " Query request and validation"""
+
     queries: list[str] = Field(..., description="List of queries")
 
     @field_validator("queries", mode="before")

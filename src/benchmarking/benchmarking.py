@@ -1,4 +1,5 @@
-"""Benchmarking to check """
+"""Benchmarking to check"""
+
 import asyncio
 import subprocess
 
