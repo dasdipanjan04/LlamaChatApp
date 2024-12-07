@@ -7,7 +7,6 @@ import httpx
 import time
 import statistics
 import matplotlib.pyplot as plt
-import json
 import psutil
 
 
