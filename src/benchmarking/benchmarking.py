@@ -2,42 +2,16 @@
 
 import asyncio
 import subprocess
-
+import argparse
 import httpx
 import time
 import statistics
 import matplotlib.pyplot as plt
-from prometheus_client import Counter, Gauge, start_http_server
-
-TOTAL_REQUESTS = Counter("total_requests", "Total number of requests")
-CONCURRENT_REQUESTS = Gauge("concurrent_requests", "Number of concurrent requests")
-SUCCESSFUL_REQUESTS = Counter(
-    "successful_requests", "Total number of successful requests"
-)
-FAILED_REQUESTS = Counter("failed_requests", "Total number of failed requests")
-AVG_LATENCY = Gauge("avg_latency", "Average latency in seconds")
-MIN_LATENCY = Gauge("min_latency", "Minimum latency in seconds")
-MAX_LATENCY = Gauge("max_latency", "Maximum latency in seconds")
-THROUGHPUT = Gauge("throughput", "Throughput (requests per second)")
-GPU_UTILIZATION_BEFORE = Gauge(
-    "gpu_utilization_before", "GPU utilization before benchmarking"
-)
-GPU_UTILIZATION_AFTER = Gauge(
-    "gpu_utilization_after", "GPU utilization after benchmarking"
-)
-
-URL = "http://127.0.0.1:8000/query"
-
-PROMPTS = [
-    "What is the capital of France?",
-    "Explain quantum mechanics.",
-    "How does a black hole work?",
-    "Tell me a joke.",
-    "What is the future of AI?",
-]
+import json
+import psutil
 
 
-async def send_request(client, prompt):
+async def send_request(url, client, prompt):
     """
     Send prompt request to client to check latency, response
 
@@ -48,15 +22,14 @@ async def send_request(client, prompt):
     Returns:
         Returns latency, response status code, response text
     """
-    payload = {"queries": [prompt]}
+    payload = {"queries": prompt}
     start_time = time.time()
     try:
-        response = await client.post(URL, json=payload)
+        response = await client.post(url, json=payload)
         response.raise_for_status()
         latency = time.time() - start_time
         return latency, response.status_code, response.text
     except Exception as e:
-        FAILED_REQUESTS.inc()
         return None, None, str(e)
 
 
@@ -92,11 +65,56 @@ def get_gpu_utilization():
         }
 
 
-async def send_request_with_semaphore(client, prompt, semaphore):
+def get_cpu_utilization():
+    """
+    Get CPU Utilization
+
+    Args:
+
+    Returns:
+        Returns CPU Utilization Data
+    """
+    try:
+        cpu_percent = psutil.cpu_percent(interval=None)
+        memory_info = psutil.virtual_memory()
+        return {
+            "cpu_utilization": cpu_percent,
+            "memory_used": memory_info.used // (1024 * 1024),
+            "memory_total": memory_info.total // (1024 * 1024),
+        }
+    except Exception:
+        return {"cpu_utilization": None, "memory_used": None, "memory_total": None}
+
+
+async def log_resource_stats(gpu_stats_over_time, cpu_stats_over_time, start_time):
+    """
+    Log GPU and CPU Utilization
+
+    Args:
+
+    Returns:
+        None
+    """
+    while True:
+        gpu_stat = get_gpu_utilization()
+        cpu_stat = get_cpu_utilization()
+        timestamp = time.time() - start_time
+
+        gpu_stat["timestamp"] = timestamp
+        cpu_stat["timestamp"] = timestamp
+
+        gpu_stats_over_time.append(gpu_stat)
+        cpu_stats_over_time.append(cpu_stat)
+
+        await asyncio.sleep(1)
+
+
+async def send_request_with_semaphore(url, client, prompt, semaphore):
     """
     Semaphore request
 
     Args:
+        url: url
         client: API Client
         prompt: Prompt
         semaphore: semaphore
@@ -105,10 +123,10 @@ async def send_request_with_semaphore(client, prompt, semaphore):
         Returns GPU Utilization Data
     """
     async with semaphore:
-        return await send_request(client, prompt)
+        return await send_request(url, client, prompt)
 
 
-async def benchmark_service(concurrent_requests, num_requests):
+async def benchmark_service(url, concurrent_requests, num_requests):
     """
     Benchmark Service
 
@@ -123,32 +141,26 @@ async def benchmark_service(concurrent_requests, num_requests):
         semaphore = asyncio.Semaphore(concurrent_requests)
 
         gpu_stats_over_time = []
+        cpu_stats_over_time = []
         start_time = time.time()
 
-        async def log_gpu_stats(gpu_stats_over_time, start_time):
-            while True:
-                gpu_stats = get_gpu_utilization()
-                gpu_stats["timestamp"] = time.time() - start_time
-                gpu_stats_over_time.append(gpu_stats)
-                await asyncio.sleep(1)
-
-        gpu_logger_task = asyncio.create_task(
-            log_gpu_stats(gpu_stats_over_time, start_time)
+        resource_logger_task = asyncio.create_task(
+            log_resource_stats(gpu_stats_over_time, cpu_stats_over_time, start_time)
         )
         gpu_stats_before = get_gpu_utilization()
-        GPU_UTILIZATION_BEFORE.set(gpu_stats_before["gpu_utilization"])
+        cpu_stats_before = get_cpu_utilization()
         tasks = [
-            send_request_with_semaphore(client, PROMPTS[_ % len(PROMPTS)], semaphore)
-            # send_request(client, PROMPTS[_ % len(PROMPTS)])
+            send_request_with_semaphore(url, client, prompts, semaphore)
+            # send_request(client, prompts[_ % len(prompts)])
             for _ in range(num_requests)
         ]
 
         responses = await asyncio.gather(*tasks, return_exceptions=True)
-        gpu_logger_task.cancel()
+        resource_logger_task.cancel()
         gpu_stats_after = get_gpu_utilization()
-        GPU_UTILIZATION_AFTER.set(gpu_stats_after["gpu_utilization"])
+        cpu_stats_after = get_cpu_utilization()
         try:
-            await gpu_logger_task
+            await resource_logger_task
         except asyncio.CancelledError:
             pass
         print(f"GPU utilisation after benchmarking {gpu_stats_after}")
@@ -171,15 +183,6 @@ async def benchmark_service(concurrent_requests, num_requests):
         min_latency = min(latencies, default=0)
         throughput = successful_requests / sum(latencies) if latencies else 0
 
-        TOTAL_REQUESTS.inc(total_requests)
-        CONCURRENT_REQUESTS.set(concurrent_requests)
-        SUCCESSFUL_REQUESTS.inc(successful_requests)
-        FAILED_REQUESTS.inc(errors)
-        AVG_LATENCY.set(avg_latency)
-        MIN_LATENCY.set(min_latency)
-        MAX_LATENCY.set(max_latency)
-        THROUGHPUT.set(throughput)
-
         print("\nBenchmark Results:")
         print(f"Total Requests: {total_requests}")
         print(f"Successful Requests: {successful_requests}")
@@ -201,24 +204,27 @@ async def benchmark_service(concurrent_requests, num_requests):
             "gpu_stats_before": gpu_stats_before,
             "gpu_stats_after": gpu_stats_after,
             "gpu_stats_over_time": gpu_stats_over_time,
+            "cpu_stats_before": cpu_stats_before,
+            "cpu_stats_after": cpu_stats_after,
+            "cpu_stats_over_time": cpu_stats_over_time,
         }
 
 
-def plot_gpu_stats_over_concurrency(gpu_stats):
+def plot_resource_stats_over_concurrency(resource_stats, resource: str):
     """
     Plot GPU stats
 
     Args:
-        gpu_stats: GPU Stats
-
+        resource_stats: Resource Stats
+        resource: Resource name
     Returns:
         None
     """
     plt.figure(figsize=(12, 8))
 
-    for concurrency, stats in gpu_stats.items():
+    for concurrency, stats in resource_stats.items():
         timestamps = [s["timestamp"] for s in stats]
-        gpu_utilization = [s["gpu_utilization"] for s in stats]
+        gpu_utilization = [s[f"{resource}_utilization"] for s in stats]
         memory_used = [s["memory_used"] for s in stats]
 
         plt.plot(
@@ -227,7 +233,9 @@ def plot_gpu_stats_over_concurrency(gpu_stats):
             label=f"Concurrency {concurrency} - GPU Utilization (%)",
         )
 
-    plt.title("GPU Utilization Over Time for Different Concurrency Levels")
+    plt.title(
+        f"{resource.upper()} Utilization Over Time for Different Concurrency Levels"
+    )
     plt.xlabel("Time (seconds)")
     plt.ylabel("GPU Utilization (%)")
     plt.legend()
@@ -236,7 +244,7 @@ def plot_gpu_stats_over_concurrency(gpu_stats):
 
     plt.figure(figsize=(12, 8))
 
-    for concurrency, stats in gpu_stats.items():
+    for concurrency, stats in resource_stats.items():
         timestamps = [s["timestamp"] for s in stats]
         memory_used = [s["memory_used"] for s in stats]
 
@@ -246,7 +254,9 @@ def plot_gpu_stats_over_concurrency(gpu_stats):
             label=f"Concurrency {concurrency} - Memory Used (MB)",
         )
 
-    plt.title("GPU Memory Usage Over Time for Different Concurrency Levels")
+    plt.title(
+        f"{resource.upper()} Memory Usage Over Time for Different Concurrency Levels"
+    )
     plt.xlabel("Time (seconds)")
     plt.ylabel("Memory Used (MB)")
     plt.legend()
@@ -294,16 +304,59 @@ def plot_throughput_vs_concurrency(throughput, concurrency):
     plt.show()
 
 
+def parse_arguments():
+    """
+    Parse command-line arguments.
+
+    Args:
+
+    Returns:
+        ArgumentParser
+    """
+    parser = argparse.ArgumentParser(description="Benchmarking tool for the service.")
+    parser.add_argument(
+        "--concurrency_levels",
+        type=int,
+        nargs="+",
+        required=True,
+        help="List of concurrency levels to test (e.g., 1 2 3 4).",
+    )
+    parser.add_argument(
+        "--num_requests",
+        type=int,
+        required=True,
+        help="Number of requests per concurrency level.",
+    )
+    parser.add_argument(
+        "--prompts",
+        nargs="+",
+        default=[],
+        help=' list of prompts (e.g., ["Prompt 1", "Prompt 2"]).',
+    )
+    parser.add_argument(
+        "--url",
+        type=str,
+        required=True,
+        help="URL of the service to benchmark (e.g., http://127.0.0.1:8000/query).",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    start_http_server(9200)
-    concurrency_levels = [1, 2, 3, 4]
-    num_requests_per_level = 5
+    args = parse_arguments()
+    concurrency_levels = args.concurrency_levels
+    num_requests_per_level = args.num_requests
+    prompts = args.prompts
+    url = args.url
+
     results = []
     for concurrency in concurrency_levels:
         print(f"\nTesting with {concurrency} concurrent requests:")
         result = asyncio.run(
             benchmark_service(
-                concurrent_requests=concurrency, num_requests=num_requests_per_level
+                url,
+                concurrent_requests=concurrency,
+                num_requests=num_requests_per_level,
             )
         )
         results.append((concurrency, result))
@@ -314,7 +367,10 @@ if __name__ == "__main__":
     gpu_stats = {
         r[1]["concurrent_requests"]: r[1]["gpu_stats_over_time"] for r in results
     }
-
+    cpu_stats = {
+        r[1]["concurrent_requests"]: r[1]["cpu_stats_over_time"] for r in results
+    }
     plot_avg_latency_vs_concurrency(avg_latency, concurrency)
     plot_throughput_vs_concurrency(throughput, concurrency)
-    plot_gpu_stats_over_concurrency(gpu_stats)
+    plot_resource_stats_over_concurrency(gpu_stats, "gpu")
+    plot_resource_stats_over_concurrency(cpu_stats, "cpu")
