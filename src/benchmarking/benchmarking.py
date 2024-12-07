@@ -7,6 +7,24 @@ import httpx
 import time
 import statistics
 import matplotlib.pyplot as plt
+from prometheus_client import Counter, Gauge, start_http_server
+
+TOTAL_REQUESTS = Counter("total_requests", "Total number of requests")
+CONCURRENT_REQUESTS = Gauge("concurrent_requests", "Number of concurrent requests")
+SUCCESSFUL_REQUESTS = Counter(
+    "successful_requests", "Total number of successful requests"
+)
+FAILED_REQUESTS = Counter("failed_requests", "Total number of failed requests")
+AVG_LATENCY = Gauge("avg_latency", "Average latency in seconds")
+MIN_LATENCY = Gauge("min_latency", "Minimum latency in seconds")
+MAX_LATENCY = Gauge("max_latency", "Maximum latency in seconds")
+THROUGHPUT = Gauge("throughput", "Throughput (requests per second)")
+GPU_UTILIZATION_BEFORE = Gauge(
+    "gpu_utilization_before", "GPU utilization before benchmarking"
+)
+GPU_UTILIZATION_AFTER = Gauge(
+    "gpu_utilization_after", "GPU utilization after benchmarking"
+)
 
 URL = "http://127.0.0.1:8000/query"
 
@@ -38,8 +56,8 @@ async def send_request(client, prompt):
         latency = time.time() - start_time
         return latency, response.status_code, response.text
     except Exception as e:
-        latency = time.time() - start_time
-        return latency, None, str(e)
+        FAILED_REQUESTS.inc()
+        return None, None, str(e)
 
 
 def get_gpu_utilization():
@@ -67,7 +85,6 @@ def get_gpu_utilization():
             "memory_total": memory_total,
         }
     except Exception as e:
-        print(f"Failed to get GPU utilization: {e}")
         return {
             "gpu_utilization": 0,
             "memory_used": 0,
@@ -92,6 +109,16 @@ async def send_request_with_semaphore(client, prompt, semaphore):
 
 
 async def benchmark_service(concurrent_requests, num_requests):
+    """
+    Benchmark Service
+
+    Args:
+        concurrent_requests:
+        num_requests:
+
+    Returns:
+        Returns Metrics
+    """
     async with httpx.AsyncClient(timeout=120) as client:
         semaphore = asyncio.Semaphore(concurrent_requests)
 
@@ -109,6 +136,7 @@ async def benchmark_service(concurrent_requests, num_requests):
             log_gpu_stats(gpu_stats_over_time, start_time)
         )
         gpu_stats_before = get_gpu_utilization()
+        GPU_UTILIZATION_BEFORE.set(gpu_stats_before["gpu_utilization"])
         tasks = [
             send_request_with_semaphore(client, PROMPTS[_ % len(PROMPTS)], semaphore)
             # send_request(client, PROMPTS[_ % len(PROMPTS)])
@@ -118,6 +146,7 @@ async def benchmark_service(concurrent_requests, num_requests):
         responses = await asyncio.gather(*tasks, return_exceptions=True)
         gpu_logger_task.cancel()
         gpu_stats_after = get_gpu_utilization()
+        GPU_UTILIZATION_AFTER.set(gpu_stats_after["gpu_utilization"])
         try:
             await gpu_logger_task
         except asyncio.CancelledError:
@@ -141,6 +170,15 @@ async def benchmark_service(concurrent_requests, num_requests):
         max_latency = max(latencies, default=0)
         min_latency = min(latencies, default=0)
         throughput = successful_requests / sum(latencies) if latencies else 0
+
+        TOTAL_REQUESTS.inc(total_requests)
+        CONCURRENT_REQUESTS.set(concurrent_requests)
+        SUCCESSFUL_REQUESTS.inc(successful_requests)
+        FAILED_REQUESTS.inc(errors)
+        AVG_LATENCY.set(avg_latency)
+        MIN_LATENCY.set(min_latency)
+        MAX_LATENCY.set(max_latency)
+        THROUGHPUT.set(throughput)
 
         print("\nBenchmark Results:")
         print(f"Total Requests: {total_requests}")
@@ -257,6 +295,7 @@ def plot_throughput_vs_concurrency(throughput, concurrency):
 
 
 if __name__ == "__main__":
+    start_http_server(9200)
     concurrency_levels = [1, 2, 3, 4]
     num_requests_per_level = 5
     results = []

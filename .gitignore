@@ -1,14 +1,7 @@
 .venv
 .idea
-src/api/__pycache__/
-src/pipeline/__pycache__/
-src/log_config/__pycache__/
-src/benchmarking/__pycache__/
 .env
-src/__pycache__/
 app.log
-tests/__pycache__/
-tests/unit/__pycache__/
-tests/integration/__pycache__/
+**/__pycache__/
 AutoGPTQ/
 quantized_model_dir/

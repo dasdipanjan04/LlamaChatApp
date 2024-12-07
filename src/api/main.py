@@ -11,6 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from src.pipeline import model_manager, generate_parallel_responses
 from src.log_config import configure_logging
 from src.config import DEBUG_MODE, MAX_CONCURRENT_REQUESTS, RATE_LIMIT
+from src.metrics import metrics_endpoint
 import logging
 
 
@@ -158,3 +159,11 @@ async def process_query(request: Request, query: QueryRequest):
 
     await request_queue.put((handle_request, (query, response_callback)))
     return await response
+
+
+@app.get("/metrics")
+async def metrics():
+    return await metrics_endpoint()
+
+
+app.add_api_route("/metrics", metrics_endpoint)

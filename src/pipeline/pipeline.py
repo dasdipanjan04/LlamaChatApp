@@ -157,7 +157,6 @@ class ModelManager:
             attention_mask=inputs["attention_mask"],
             max_new_tokens=100,
             min_length=10,
-            max_length=100,
             length_penalty=0.5,
             do_sample=True,
             top_p=0.8,
@@ -168,7 +167,7 @@ class ModelManager:
             repetition_penalty=1.2,
             no_repeat_ngram_size=3,
             pad_token_id=self.tokenizer.pad_token_id,
-            early_stopping=False,
+            early_stopping=True,
         )
 
         t = Thread(target=self.model.generate, kwargs=generate_kwargs)
