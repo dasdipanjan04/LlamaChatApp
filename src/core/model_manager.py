@@ -32,10 +32,15 @@ class ModelManager:
     * Finally Generates Response
     """
 
-    def __init__(self, abuse_detector: AbuseDetector):
+    def __init__(
+        self,
+        abuse_detector: AbuseDetector,
+        llm_model: str = "mistralai/Mistral-7B-v0.1",
+    ):
         self.model = None
         self.tokenizer = None
         self.abuse_detector = abuse_detector
+        self.llm_model = llm_model
         self.lock = Lock()
 
     def _load_model(self):
@@ -50,17 +55,18 @@ class ModelManager:
         Returns:
             None
         """
-        llm_model = "mistralai/Mistral-7B-v0.1"  # "meta-llama/Llama-3.1-8B"
 
         self.tokenizer = AutoTokenizer.from_pretrained(
-            llm_model,
+            self.llm_model,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             padding_side="left",
         )
 
         self.model = AutoModelForCausalLM.from_pretrained(
-            llm_model, quantization_config=get_quantization_config(), device_map="auto"
+            self.llm_model,
+            quantization_config=get_quantization_config(),
+            device_map="auto",
         )
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token_id = (
