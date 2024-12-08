@@ -150,7 +150,6 @@ async def benchmark_service(url, concurrent_requests, num_requests):
         cpu_stats_before = get_cpu_utilization()
         tasks = [
             send_request_with_semaphore(url, client, prompts, semaphore)
-            # send_request(client, prompts[_ % len(prompts)])
             for _ in range(num_requests)
         ]
 

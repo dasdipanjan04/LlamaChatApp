@@ -1,3 +1,3 @@
 """ " API Endpoint"""
 
-from .main import app, queue_worker
+from .main import app

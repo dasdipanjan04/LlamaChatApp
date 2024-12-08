@@ -7,13 +7,13 @@ from dotenv import load_dotenv
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    BitsAndBytesConfig,
     TextIteratorStreamer,
-    pipeline,
 )
 from asyncio import to_thread
 from huggingface_hub import HfFolder
 from threading import Thread
+from src.core.quantization import get_quantization_config
+from src.core.abuse_detector import AbuseDetector
 
 load_dotenv()
 os.environ["CURL_CA_BUNDLE"] = ""
@@ -32,26 +32,11 @@ class ModelManager:
     * Finally Generates Response
     """
 
-    def __init__(self):
+    def __init__(self, abuse_detector: AbuseDetector):
         self.model = None
         self.tokenizer = None
-        self.abuse_detector = None
-        self.quantized_model_dir = "quantized_model_dir"
+        self.abuse_detector = abuse_detector
         self.lock = Lock()
-
-    async def load_model_async(self):
-        """
-        Loads the model asyncly
-
-        Args:
-            self
-
-        Returns:
-            None
-        """
-        with self.lock:
-            if self.model is None or self.abuse_detector is None:
-                await to_thread(self._load_model)
 
     def _load_model(self):
         """
@@ -79,46 +64,26 @@ class ModelManager:
                 self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
                 self.model.resize_token_embeddings(len(self.tokenizer))
 
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        )
         self.model = AutoModelForCausalLM.from_pretrained(
-            llm_model,
-            quantization_config=quantization_config,
-            device_map="auto",
+            llm_model, quantization_config=get_quantization_config(), device_map="auto"
         )
         self.model.config.pad_token_id = self.tokenizer.pad_token_id
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.eval()
 
-        self.abuse_detector = pipeline(
-            "text-classification",
-            model="unitary/toxic-bert",
-            device=0 if torch.cuda.is_available() else -1,
-        )
-
-    def is_abusive(self, text: str) -> bool:
+    async def load_model_async(self):
         """
-        Checks whether a certain prompt or response is abusive or not.
+        Loads the model asyncly
 
         Args:
             self
-            text (str): The text which needs to checked using the abuse detector
 
         Returns:
-            True or False based on whether the text is abusive or not.
+            None
         """
-        if not self.abuse_detector:
-            raise ValueError("Abuse detector is not initialized.")
-        results = self.abuse_detector(text)
-        return any(
-            result["label"] in ["toxic", "severe_toxic", "offensive"]
-            and result["score"] > 0.5
-            for result in results
-        )
+        with self.lock:
+            if self.model is None or self.abuse_detector is None:
+                await to_thread(self._load_model)
 
     async def generate_response(self, text: str):
         """
@@ -133,7 +98,7 @@ class ModelManager:
         """
         await self.load_model_async()
 
-        if self.is_abusive(text):
+        if self.abuse_detector.is_abusive(text):
             yield "Please refrain from such language.\nLet us have a constructive conversation."
             return
 
@@ -175,6 +140,3 @@ class ModelManager:
 
         for token in streamer:
             yield token
-
-
-model_manager = ModelManager()
