@@ -50,7 +50,7 @@ class ModelManager:
         Returns:
             None
         """
-        llm_model = "meta-llama/Llama-3.1-8B"
+        llm_model = "mistralai/Mistral-7B-v0.1"  # "meta-llama/Llama-3.1-8B"
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             llm_model,
@@ -58,15 +58,17 @@ class ModelManager:
             low_cpu_mem_usage=True,
             padding_side="left",
         )
-        if self.tokenizer.pad_token_id is None:
-            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-            if self.tokenizer.pad_token_id is None:
-                self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
-                self.model.resize_token_embeddings(len(self.tokenizer))
 
         self.model = AutoModelForCausalLM.from_pretrained(
             llm_model, quantization_config=get_quantization_config(), device_map="auto"
         )
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token_id = (
+                self.tokenizer.eos_token_id
+                or self.tokenizer.convert_tokens_to_ids("<pad>")
+            )
+            self.model.resize_token_embeddings(len(self.tokenizer))
+
         self.model.config.pad_token_id = self.tokenizer.pad_token_id
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.eval()
@@ -120,13 +122,13 @@ class ModelManager:
         generate_kwargs = dict(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_new_tokens=100,
+            max_length=500,
             min_length=10,
             length_penalty=0.5,
             do_sample=True,
-            top_p=0.8,
-            top_k=20,
-            temperature=0.5,
+            top_p=0.4,
+            top_k=100,
+            temperature=0.8,
             streamer=streamer,
             eos_token_id=self.tokenizer.eos_token_id,
             repetition_penalty=1.2,
