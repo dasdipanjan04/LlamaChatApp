@@ -4,6 +4,7 @@ from src.core.abuse_detector import AbuseDetector
 
 _model_manager_instance = None
 
+
 @pytest.fixture(scope="session")
 async def setup_model_manager():
     global _model_manager_instance
