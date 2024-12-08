@@ -1,6 +1,6 @@
 import re
 import pytest
-from src.pipeline import ModelManager
+from src.core.model_manager import ModelManager
 
 
 @pytest.mark.usefixtures("setup_model_manager")
@@ -12,14 +12,14 @@ def test_model_initialisation(setup_model_manager: ModelManager):
 @pytest.mark.usefixtures("setup_model_manager")
 def test_abuse_detection_positive(setup_model_manager: ModelManager):
     offensive_text = "You are stupid and dumb."
-    is_abusive = setup_model_manager.is_abusive(offensive_text)
+    is_abusive = setup_model_manager.abuse_detector.is_abusive(offensive_text)
     assert is_abusive is True, "Abuse should be detected!"
 
 
 @pytest.mark.usefixtures("setup_model_manager")
 def test_abuse_detection_negative(setup_model_manager: ModelManager):
     non_offensive_text = "Who is the author of the book 'How to kill a mocking bird'"
-    is_non_abusive = setup_model_manager.is_abusive(non_offensive_text)
+    is_non_abusive = setup_model_manager.abuse_detector.is_abusive(non_offensive_text)
     assert (
         is_non_abusive is False
     ), "Non offensive sentences should not be detected as abusive!"

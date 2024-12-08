@@ -12,7 +12,6 @@ async def test_endpoint():
         assert response.status_code == 200
 
 
-@pytest.mark.usefixtures("setup_model_manager")
 @pytest.mark.asyncio
 async def test_query_endpoint_success():
     with TestClient(app) as client:
@@ -27,7 +26,6 @@ async def test_query_endpoint_success():
         ), "The expected response should have Berlin in it."
 
 
-@pytest.mark.usefixtures("setup_model_manager")
 @pytest.mark.asyncio
 async def test_query_endpoint_abuse_detection():
     with TestClient(app) as client:
