@@ -126,7 +126,9 @@ class ModelManager:
         stopping_criteria = StoppingCriteriaList(
             [
                 MultiSentenceStoppingCriteria(
-                    self.tokenizer, **config["stopping_criteria"], punctuations=[".", "!", "?"]
+                    self.tokenizer,
+                    **config["stopping_criteria"],
+                    punctuations=[".", "!", "?"],
                 )
             ]
         )

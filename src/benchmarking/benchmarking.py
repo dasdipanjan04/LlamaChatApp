@@ -219,7 +219,11 @@ def plot_resource_stats_over_concurrency(resource_stats, resource: str):
         None
     """
     metrics = [
-        (f"{resource}_utilization", f"{resource.upper()} Utilization (%)", "Utilization"),
+        (
+            f"{resource}_utilization",
+            f"{resource.upper()} Utilization (%)",
+            "Utilization",
+        ),
         ("memory_used", "Memory Used (MB)", "Memory Usage"),
     ]
 

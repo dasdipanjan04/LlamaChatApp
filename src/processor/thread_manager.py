@@ -2,7 +2,7 @@ import asyncio
 
 
 class ThreadManager:
-    """ " Thread Manager class effectively manages the threads."""
+    """Thread Manager class effectively manages the threads."""
 
     def __init__(self):
         self.global_thread_index = 0
