@@ -4,6 +4,12 @@ WORKDIR /app
 
 COPY src ./src/
 
+COPY requirements.txt .
+
+COPY config.json .
+
+COPY entrypoint.sh /app/entrypoint.sh
+
 RUN apt update && apt upgrade -y && \
     apt install -y software-properties-common curl wget git && \
     apt update && \
@@ -13,14 +19,16 @@ RUN apt update && apt upgrade -y && \
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV PATH=/usr/local/cuda/bin:$PATH
 
-COPY requirements.txt .
-
 RUN pip3 install -r requirements.txt
 
-EXPOSE 8000
+COPY .streamlit /app/.streamlit
+
+EXPOSE 8000 8501
 
 RUN useradd -m appuser && chown -R appuser /app
 
 USER appuser
 
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["./entrypoint.sh"]
