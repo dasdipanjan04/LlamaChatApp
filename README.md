@@ -158,3 +158,41 @@ curl -X POST "http://localhost:8000/query" \
 Based one what you use (shell or cmd or powershell) the escape sequences may vary.
 You can add multiple queries here `[\"Explain Quantum Computing.\", \"What is an AI?"\]` 
 the application will handle multiple queries and request concurrently.
+
+
+## =====================================
+
+## Benchmarking
+To run the benchmarking run the following command
+
+```
+python .\src\benchmarking\benchmarking.py --concurrency_levels 1 2 3 --num_requests 10 --prompts ["What is the capital of France?", "Explain quantum mechanics."] --url "http://localhost:8000/query"
+
+```
+`--concurrency_levels 1 2 3` specifies the number of simultaneous users
+(or threads) that will make requests at the same time.
+
+`--num_requests 10` specifies the total number of requests to be 
+sent across all concurrent users.
+
+`--prompts ["What is the capital of France?", "Explain quantum mechanics."]` represents a query queue, all these will run
+in parallel.
+
+`--url "http://localhost:8000/query"` represents the endpoint url.
+
+The benchmarking script is completely independent (whether the app is running in docker or on your host os) 
+and can be run from anywhere as long as the necessary packages are installed.
+
+Benchmarking creates plots which look like the following:
+
+<table>
+  <tr>
+    <td><img src="./readme_resources/GPU_Memory_Usage.png" alt="GPU Memory Usage" width="600"/></td>
+    <td><img src="./readme_resources/CPU_Memory_Usage.png" alt="CPU Memory Usage" width="600"/></td>
+  </tr>
+  <tr>
+    <td><img src="./readme_resources/avg_latency_vs_concurrency.png" alt="Average Latency vs Concurrency" width="600"/></td>
+    <td><img src="./readme_resources/throughput_vs_concurrency.png" alt="Throughput vs Concurrency" width="600"/></td>
+  </tr>
+</table>
+
