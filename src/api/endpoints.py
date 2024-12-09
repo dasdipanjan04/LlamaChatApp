@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, Depends
+from fastapi.responses import StreamingResponse
 from src.api.validators import QueryRequest
 from src.metrics import metrics_endpoint
 import asyncio
@@ -36,13 +37,40 @@ async def process_query(
     Returns:
         response
     """
-    response = asyncio.Future()
 
-    async def response_callback(results):
-        response.set_result(results)
+    async def stream_results():
+        """
+        Stream results to the client.
 
-    await worker.request_queue.put((worker.handle_request, (query, response_callback)))
-    return await response
+        Yields:
+            str: Incremental updates and final results.
+        """
+        queue = asyncio.Queue()
+
+        async def response_callback(results):
+            """
+            Response callback to send results incrementally or as the final response.
+
+            Args:
+                results (dict): The result to send.
+            """
+            if isinstance(results, dict) and "final" in results:
+                await queue.put(f"{results['final']} \n\n")
+                await queue.put(None)
+            else:
+                await queue.put(f"{results} \n\n")
+
+        await worker.request_queue.put(
+            (worker.handle_request, (query, response_callback))
+        )
+
+        while True:
+            update = await queue.get()
+            if update is None:
+                break
+            yield update
+
+    return StreamingResponse(stream_results(), media_type="text/event-stream")
 
 
 @router.get("/metrics")

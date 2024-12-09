@@ -11,62 +11,69 @@ class ParallelProcessor:
         self.model_manager = model_manager
         self.thread_manager = thread_manager
 
-    async def process_prompt(self, prompt: str):
+    async def stream_to_endpoint(self, message, response_callback):
         """
-        Process prompt to generate response asyncly
+        Stream data to the endpoint using the provided callback.
 
         Args:
-            prompt: The prompt which be passed to the llama response generator
+            message: The message to stream.
+            response_callback: Callback to push the message to the endpoint.
+        Return:
+
+        """
+        await response_callback(message)
+
+    async def process_prompt(self, prompt: str, response_callback):
+        """
+        Process prompt to generate response asyncly and stream updates.
+
+        Args:
+            prompt: The prompt to process.
+            response_callback: Callback to stream updates to the endpoint.
 
         Returns:
-            Returns the response
+            The final response.
         """
         thread_index = await self.thread_manager.get_next_thread_index()
-
-        start_time = time.time()
-        print(f"Thread {thread_index} started at {start_time:.2f}")
-        print(f"Thread {thread_index} Response: ", end="", flush=True)
 
         response = ""
         token_count = 0
         try:
             async for token in self.model_manager.generate_response(prompt):
-                print(
-                    f"\nThread {thread_index}: Word{token_count}_{thread_index} -> {token}",
-                    end="",
-                    flush=True,
+                await self.stream_to_endpoint(
+                    token,
+                    response_callback,
                 )
                 response += token
                 token_count += 1
         except Exception as e:
             logging.error(f"Thread {thread_index} encountered an error: {e}")
             response = f"Error generating response: {e}"
-        end_time = time.time()
-        print(
-            f"\nThread {thread_index} completed at {end_time:.2f} (Duration: {end_time - start_time:.2f}s)"
-        )
+            await self.stream_to_endpoint(response, response_callback)
         return response
 
-    async def generate_parallel_responses(self, prompts: list[str]):
+    async def generate_parallel_responses(self, prompts: list[str], response_callback):
         """
         Generate parallel responses for multiple prompts.
 
         Args:
             prompts (list[str]): List of prompts.
+            response_callback: Callback to stream updates to the endpoint.
 
         Returns:
             dict: A dictionary of thread indices to responses.
         """
-        results = {}
         with ThreadPoolExecutor(max_workers=len(prompts)) as executor:
             loop = asyncio.get_event_loop()
             tasks = [
-                loop.run_in_executor(executor, asyncio.run, self.process_prompt(prompt))
+                loop.run_in_executor(
+                    executor,
+                    asyncio.run,
+                    self.process_prompt(prompt, response_callback),
+                )
                 for prompt in prompts
             ]
-            responses = await asyncio.gather(*tasks)
 
-        for idx, response in enumerate(responses):
-            results[idx] = response
+            await asyncio.gather(*tasks)
 
-        return results
+        await response_callback("")
