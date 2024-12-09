@@ -42,13 +42,16 @@ class Worker:
             logging.debug(f"Handling request: {request.queries}")
 
             async def streaming_callback(update):
-                await response_callback(update)
+                if update:
+                    await response_callback(update)
 
             results = await self.parallel_processor.generate_parallel_responses(
                 request.queries, streaming_callback
             )
-
-            await response_callback({"final": results})
+            if results:
+                await response_callback({"final": results})
+            else:
+                await response_callback({"final": ""})
 
         except Exception as e:
             logging.error(f"Error handling request: {e}")

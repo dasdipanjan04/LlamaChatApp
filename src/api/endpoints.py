@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from src.api.validators import QueryRequest
 from src.metrics import metrics_endpoint
 import asyncio
+import logging
 
 router = APIRouter()
 
@@ -66,7 +67,9 @@ async def process_query(
 
         while True:
             update = await queue.get()
+            logging.debug(f"Dequeued update: {update}")
             if update is None:
+                logging.debug("Received termination signal. Exiting stream.")
                 break
             yield update
 
