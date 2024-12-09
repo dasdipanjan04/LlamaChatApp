@@ -210,7 +210,7 @@ async def benchmark_service(url, concurrent_requests, num_requests):
 
 def plot_resource_stats_over_concurrency(resource_stats, resource: str):
     """
-    Plot GPU stats
+    Plot Resource stats
 
     Args:
         resource_stats: Resource Stats
@@ -218,48 +218,32 @@ def plot_resource_stats_over_concurrency(resource_stats, resource: str):
     Returns:
         None
     """
-    plt.figure(figsize=(12, 8))
+    metrics = [
+        (f"{resource}_utilization", f"{resource.upper()} Utilization (%)", "Utilization"),
+        ("memory_used", "Memory Used (MB)", "Memory Usage"),
+    ]
 
-    for concurrency, stats in resource_stats.items():
-        timestamps = [s["timestamp"] for s in stats]
-        gpu_utilization = [s[f"{resource}_utilization"] for s in stats]
-        memory_used = [s["memory_used"] for s in stats]
+    for metric_key, y_label, title_suffix in metrics:
+        plt.figure(figsize=(12, 8))
 
-        plt.plot(
-            timestamps,
-            gpu_utilization,
-            label=f"Concurrency {concurrency} - GPU Utilization (%)",
+        for concurrency, stats in resource_stats.items():
+            timestamps = [s["timestamp"] for s in stats]
+            metric_values = [s[metric_key] for s in stats]
+
+            plt.plot(
+                timestamps,
+                metric_values,
+                label=f"Concurrency {concurrency} - {y_label}",
+            )
+
+        plt.title(
+            f"{resource.upper()} {title_suffix} Over Time for Different Concurrency Levels"
         )
-
-    plt.title(
-        f"{resource.upper()} Utilization Over Time for Different Concurrency Levels"
-    )
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("GPU Utilization (%)")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-    plt.figure(figsize=(12, 8))
-
-    for concurrency, stats in resource_stats.items():
-        timestamps = [s["timestamp"] for s in stats]
-        memory_used = [s["memory_used"] for s in stats]
-
-        plt.plot(
-            timestamps,
-            memory_used,
-            label=f"Concurrency {concurrency} - Memory Used (MB)",
-        )
-
-    plt.title(
-        f"{resource.upper()} Memory Usage Over Time for Different Concurrency Levels"
-    )
-    plt.xlabel("Time (seconds)")
-    plt.ylabel("Memory Used (MB)")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+        plt.xlabel("Time (seconds)")
+        plt.ylabel(y_label)
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f"{resource.upper()}_Memory_Usage.png")
 
 
 def plot_avg_latency_vs_concurrency(avg_latency, concurrency):
@@ -279,7 +263,7 @@ def plot_avg_latency_vs_concurrency(avg_latency, concurrency):
     plt.xlabel("Concurrency Level")
     plt.ylabel("Average Latency (seconds)")
     plt.grid(True)
-    plt.show()
+    plt.savefig("avg_latency_vs_concurrency.png")
 
 
 def plot_throughput_vs_concurrency(throughput, concurrency):
@@ -299,7 +283,7 @@ def plot_throughput_vs_concurrency(throughput, concurrency):
     plt.xlabel("Concurrency Level")
     plt.ylabel("Throughput (requests/second)")
     plt.grid(True)
-    plt.show()
+    plt.savefig("throughput_vs_concurrency.png")
 
 
 def parse_arguments():
