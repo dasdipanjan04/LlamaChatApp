@@ -3,5 +3,3 @@
 .env
 app.log
 **/__pycache__/
-AutoGPTQ/
-quantized_model_dir/
