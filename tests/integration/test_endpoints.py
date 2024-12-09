@@ -11,13 +11,14 @@ async def test_endpoint():
         response = client.get("/health")
         assert response.status_code == 200
 
+
 @pytest.mark.asyncio
 async def test_query_endpoint_success():
     with TestClient(app) as client:
         response = client.post(
             "/query",
             json={"queries": ["What is the capital city of Germany?"]},
-            headers={"Accept": "text/event-stream"}
+            headers={"Accept": "text/event-stream"},
         )
         assert response.status_code == 200
 
@@ -34,13 +35,14 @@ async def test_query_endpoint_success():
             r"\bBerlin\b", final_result, re.IGNORECASE
         ), "The expected response should have Berlin in it."
 
+
 @pytest.mark.asyncio
 async def test_query_endpoint_abuse_detection():
     with TestClient(app) as client:
         response = client.post(
             "/query",
             json={"queries": ["Why are you so stupid and dumb?"]},
-            headers={"Accept": "text/event-stream"}
+            headers={"Accept": "text/event-stream"},
         )
         assert response.status_code == 200
 
@@ -53,5 +55,6 @@ async def test_query_endpoint_abuse_detection():
                 break
             final_result += line
 
-        assert ("Let us have a constructive conversation" in final_result
+        assert (
+            "Let us have a constructive conversation" in final_result
         ), "Abuse detection should warn the user."
