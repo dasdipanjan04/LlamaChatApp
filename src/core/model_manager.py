@@ -2,18 +2,22 @@
 
 import os
 import torch
+import json
 from threading import Lock
+from pathlib import Path
 from dotenv import load_dotenv
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     TextIteratorStreamer,
+    StoppingCriteriaList,
 )
 from asyncio import to_thread
 from huggingface_hub import HfFolder
 from threading import Thread
 from src.core.quantization import get_quantization_config
 from src.core.abuse_detector import AbuseDetector
+from src.core.multi_sentence_stopping_criteria import MultiSentenceStoppingCriteria
 
 load_dotenv()
 os.environ["CURL_CA_BUNDLE"] = ""
@@ -110,37 +114,30 @@ class ModelManager:
             yield "Please refrain from such language.\nLet us have a constructive conversation."
             return
 
-        inputs = self.tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=2048,
-            padding=True,
-            return_attention_mask=True,
-        ).to("cuda")
-        streamer = TextIteratorStreamer(
-            self.tokenizer,
-            timeout=60.0,
-            skip_special_tokens=True,
-            skip_prompt=True,
-        )
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        config_path = base_dir / "config.json"
 
+        with open(config_path, "r") as config_file:
+            config = json.load(config_file)
+
+        inputs = self.tokenizer(text, **config["tokenizer"]).to("cuda")
+
+        streamer = TextIteratorStreamer(self.tokenizer, **config["streamer"])
+        stopping_criteria = StoppingCriteriaList(
+            [
+                MultiSentenceStoppingCriteria(
+                    self.tokenizer, **config["stopping_criteria"], punctuations=[".", "!", "?"]
+                )
+            ]
+        )
         generate_kwargs = dict(
             input_ids=inputs["input_ids"],
             attention_mask=inputs["attention_mask"],
-            max_length=100,
-            min_length=10,
-            length_penalty=0.5,
-            do_sample=True,
-            top_p=0.4,
-            top_k=50,
-            temperature=0.8,
+            **config["generate_kwargs"],
             streamer=streamer,
             eos_token_id=self.tokenizer.eos_token_id,
-            repetition_penalty=1.2,
-            no_repeat_ngram_size=3,
             pad_token_id=self.tokenizer.pad_token_id,
-            early_stopping=True,
+            stopping_criteria=stopping_criteria,
         )
 
         t = Thread(target=self.model.generate, kwargs=generate_kwargs)
