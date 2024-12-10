@@ -197,6 +197,10 @@ Benchmarking creates plots which look like the following:
   </tr>
 </table>
 
+The benchmarking script also saves the results in a csv file, if opened in Excel and 
+converted to Transform Data, you will see an organized table.
+Excel --> Data --> From Text/CSV --> Load The file --> Load
+
 ## =====================================
 
 ## Unit and Integration Tests using Dockerfile.test

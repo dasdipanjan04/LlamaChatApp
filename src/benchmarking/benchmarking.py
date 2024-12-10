@@ -8,6 +8,9 @@ import time
 import statistics
 import matplotlib.pyplot as plt
 import psutil
+import logging
+import csv
+import json
 
 
 async def send_request(url, client, prompt):
@@ -161,7 +164,7 @@ async def benchmark_service(url, concurrent_requests, num_requests):
             await resource_logger_task
         except asyncio.CancelledError:
             pass
-        print(f"GPU utilisation after benchmarking {gpu_stats_after}")
+        logging.debug(f"GPU utilisation after benchmarking {gpu_stats_after}")
         latencies = []
         errors = 0
         for result in responses:
@@ -181,14 +184,14 @@ async def benchmark_service(url, concurrent_requests, num_requests):
         min_latency = min(latencies, default=0)
         throughput = successful_requests / sum(latencies) if latencies else 0
 
-        print("\nBenchmark Results:")
-        print(f"Total Requests: {total_requests}")
-        print(f"Successful Requests: {successful_requests}")
-        print(f"Failed Requests: {errors}")
-        print(f"Average Latency: {avg_latency:.2f} seconds")
-        print(f"Min Latency: {min_latency:.2f} seconds")
-        print(f"Max Latency: {max_latency:.2f} seconds")
-        print(f"Throughput: {throughput:.2f} requests/second")
+        logging.debug("\nBenchmark Results:")
+        logging.debug(f"Total Requests: {total_requests}")
+        logging.debug(f"Successful Requests: {successful_requests}")
+        logging.debug(f"Failed Requests: {errors}")
+        logging.debug(f"Average Latency: {avg_latency:.2f} seconds")
+        logging.debug(f"Min Latency: {min_latency:.2f} seconds")
+        logging.debug(f"Max Latency: {max_latency:.2f} seconds")
+        logging.debug(f"Throughput: {throughput:.2f} requests/second")
 
         return {
             "total_requests": total_requests,
@@ -328,6 +331,55 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def save_detailed_benchmark_results_to_csv(filename, benchmark_results):
+    """
+    Save detailed benchmark results to a CSV file.
+
+    Args:
+        filename (str): The name of the CSV file where the results will be saved.
+        benchmark_results (list): List of tuples (concurrency level, detailed results dictionary).
+    Return
+
+    """
+    headers = [
+        "Concurrency Level",
+        "Total Requests",
+        "Successful Requests",
+        "Failed Requests",
+        "Average Latency (s)",
+        "Min Latency (s)",
+        "Max Latency (s)",
+        "Throughput (req/s)",
+        "GPU Stats Before",
+        "GPU Stats After",
+        "CPU Stats Before",
+        "CPU Stats After",
+    ]
+
+    with open(filename, mode="w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=headers)
+
+        writer.writeheader()
+
+        for concurrency, result in benchmark_results:
+            writer.writerow(
+                {
+                    "Concurrency Level": concurrency,  # Extracted from the tuple
+                    "Total Requests": result["total_requests"],
+                    "Successful Requests": result["successful_requests"],
+                    "Failed Requests": result["failed_requests"],
+                    "Average Latency (s)": f"{result['avg_latency']:.2f}",
+                    "Min Latency (s)": f"{result['min_latency']:.2f}",
+                    "Max Latency (s)": f"{result['max_latency']:.2f}",
+                    "Throughput (req/s)": f"{result['throughput']:.2f}",
+                    "GPU Stats Before": json.dumps(result["gpu_stats_before"]),
+                    "GPU Stats After": json.dumps(result["gpu_stats_after"]),
+                    "CPU Stats Before": json.dumps(result["cpu_stats_before"]),
+                    "CPU Stats After": json.dumps(result["cpu_stats_after"]),
+                }
+            )
+
+
 if __name__ == "__main__":
     args = parse_arguments()
     concurrency_levels = args.concurrency_levels
@@ -337,7 +389,7 @@ if __name__ == "__main__":
 
     results = []
     for concurrency in concurrency_levels:
-        print(f"\nTesting with {concurrency} concurrent requests:")
+        logging.debug(f"\nTesting with {concurrency} concurrent requests:")
         result = asyncio.run(
             benchmark_service(
                 url,
@@ -346,7 +398,6 @@ if __name__ == "__main__":
             )
         )
         results.append((concurrency, result))
-        print(f"Benchmark Results: {result}")
     concurrency = [r[0] for r in results]
     avg_latency = [r[1]["avg_latency"] for r in results]
     throughput = [r[1]["throughput"] for r in results]
@@ -356,6 +407,9 @@ if __name__ == "__main__":
     cpu_stats = {
         r[1]["concurrent_requests"]: r[1]["cpu_stats_over_time"] for r in results
     }
+
+    save_detailed_benchmark_results_to_csv("detailed_benchmark_results.csv", results)
+
     plot_avg_latency_vs_concurrency(avg_latency, concurrency)
     plot_throughput_vs_concurrency(throughput, concurrency)
     plot_resource_stats_over_concurrency(gpu_stats, "gpu")
