@@ -1,3 +1,5 @@
+[![Tests](https://https://github.com/dasdipanjan04/LlamaChatApp/actions/workflows/llama_test.yml/badge.svg?branch=master)](https://github.com/dasdipanjan04/LlamaChatApp/actions/workflows/llama_test.yml) 
+
 ## Llama Based Chat App
 
 # Instructions:
