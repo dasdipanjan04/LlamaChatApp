@@ -9,7 +9,7 @@ on:
 
 jobs:
   docker-test:
-    runs-on: DIPANJANWIN11
+    runs-on: self-hosted
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
