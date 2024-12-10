@@ -19,8 +19,7 @@
     "top_k": 100,
     "temperature": 0.8,
     "repetition_penalty": 1.2,
-    "no_repeat_ngram_size": 3,
-    "early_stopping": true
+    "no_repeat_ngram_size": 3
   },
   "stopping_criteria": {
     "num_sentences": 10000
