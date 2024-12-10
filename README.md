@@ -196,3 +196,20 @@ Benchmarking creates plots which look like the following:
   </tr>
 </table>
 
+## =====================================
+
+## Unit and Integration Tests using Dockerfile.test
+
+Use the following command to test the unit and integration tests using a Dockerfile.test
+
+```
+docker build -f Dockerfile.test --no-cache -t fastapi-llama-service-test:latest .
+```
+
+`--no-cache` is optional
+
+Use the following command to run the tests
+
+```
+docker run --gpus all -e API_TOKEN="YOUR_API_TOKEN" fastapi-llama-service-test:latest
+```
