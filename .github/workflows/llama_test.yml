@@ -1,0 +1,22 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  docker-test:
+    runs-on: DIPANJANWIN11
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: docker build -f Dockerfile.test -t fastapi-llama-service-test:latest .
+
+      - name: Run Docker Container
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+        run: docker run --gpus all -e API_TOKEN="${{ secrets.API_TOKEN }}" fastapi-llama-service-test:latest
