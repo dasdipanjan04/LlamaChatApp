@@ -218,3 +218,10 @@ Use the following command to run the tests
 ```
 docker run --gpus all -e API_TOKEN="YOUR_API_TOKEN" fastapi-llama-service-test:latest
 ```
+The test process is slow as during the test models will be downloaded. The model downloading part 
+can be used in the Dockerfile which will be time consuiming only during the first build but not 
+during the tests but in that case we need to pass an ARG for the API_TOKEN, during the build we can 
+provide the API_TOKEN but Docker console exposes the API during build and the container also stores 
+the token which is not really safe. Keeping the security concern in mind I have decided to pass the 
+token during run which does not expose any token. In the CI/CD pipeline I have used github secrets 
+to save the API_TOKEN.
