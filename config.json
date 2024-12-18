@@ -22,6 +22,6 @@
     "no_repeat_ngram_size": 3
   },
   "stopping_criteria": {
-    "num_sentences": 10000
+    "num_sentences": 10
   }
 }

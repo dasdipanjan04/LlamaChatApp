@@ -1,7 +1,7 @@
 import torch
 from transformers import StoppingCriteria
 import nltk
-from nltk.tokenize import sent_tokenize
+from nltk.tokenize import sent_tokenize, word_tokenize
 
 nltk.download("punkt_tab")
 
@@ -16,12 +16,13 @@ class MultiSentenceStoppingCriteria(StoppingCriteria):
             num_sentences: Number of sentences before stopping.
             punctuations: List of sentence-ending punctuations.
         """
+        self.punctuations = punctuations
         if punctuations is None:
             punctuations = [".", "!", "?"]
         self.tokenizer = tokenizer
-        self.eos_tokens = [tokenizer.convert_tokens_to_ids(p) for p in punctuations]
         self.num_sentences = num_sentences
         self.current_text = ""
+        self.stop_count = 0
 
     def __call__(
         self, input_ids: torch.LongTensor, scores: torch.FloatTensor, **kwargs
@@ -41,4 +42,7 @@ class MultiSentenceStoppingCriteria(StoppingCriteria):
         self.current_text += new_text
 
         sentences = sent_tokenize(self.current_text)
-        return len(sentences) >= self.num_sentences
+        words = [word_tokenize(s) for s in sentences]
+        if any(word in self.punctuations for word in words):
+            self.stop_count += 1
+        return self.stop_count >= self.num_sentences
